@@ -270,7 +270,6 @@ def generate_passage_retrieval_files(paths: Tuple[str], only_english: bool = Tru
                 if question_text and instances:
                     output[question_text] = instances
 
-
     with open(output_path, "w") as fo:
         json.dump(output, fo)
 

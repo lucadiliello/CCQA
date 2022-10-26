@@ -84,8 +84,6 @@ def generate_closed_book_format(paths: Tuple[str], only_english: bool = True, ke
     with open(output_path, "w") as fo:
         json.dump(output, fo)
 
-    return None
-
 
 def main(args: Namespace):
 
