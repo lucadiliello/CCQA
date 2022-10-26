@@ -122,7 +122,4 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_workers", type=int, default=1, help="Use multiprocessing"
     )
-    args = parser.parse_args()
-    generate_closed_book_format(
-        args.data_path, args.only_english, args.keep_markup, args.output_path
-    )
+    main(parser.parse_args())
