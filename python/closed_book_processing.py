@@ -102,7 +102,8 @@ def main(args: Namespace):
     pool = Pool(args.num_workers)
     fn_worker = partial(generate_closed_book_format, only_english=args.only_english, keep_markup=args.keep_markup)
     
-    tqdm(pool.map(fn_worker, files), desc="Processing...", total=len(files))
+    for _ in tqdm(pool.map(fn_worker, files), desc="Processing...", total=len(files)):
+        pass
 
 
 if __name__ == "__main__":
