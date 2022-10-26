@@ -84,6 +84,8 @@ def generate_closed_book_format(paths: Tuple[str], only_english: bool = True, ke
     with open(output_path, "w") as fo:
         json.dump(output, fo)
 
+    return None
+
 
 def main(args: Namespace):
 
@@ -99,11 +101,10 @@ def main(args: Namespace):
             os.path.join(args.output_folder, filename),
         ))
 
-    pool = Pool(args.num_workers)
     fn_worker = partial(generate_closed_book_format, only_english=args.only_english, keep_markup=args.keep_markup)
     
-    for _ in tqdm(pool.map(fn_worker, files), desc="Processing...", total=len(files)):
-        pass
+    with Pool(args.num_workers) as pool:
+        list(tqdm(pool.imap(fn_worker, files), desc="Processing...", total=len(files)))
 
 
 if __name__ == "__main__":
