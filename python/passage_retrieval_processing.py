@@ -4,14 +4,16 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
+from functools import partial
 import html
 import json
-import argparse
+from multiprocessing import Pool
 import os
 import random
 import re
-import time
-
+from argparse import ArgumentParser, Namespace
+from typing import Tuple
+from tqdm import tqdm
 from lxml import etree
 
 
@@ -206,33 +208,45 @@ def no_info(answers, question_text, keep_markup):
         }
 
 
-def generate_passage_retrieval_files(data_path, only_english, keep_markup, output_path):
-    instances = []
-    with open(data_path, "r") as f:
-        for website in f:
+def generate_passage_retrieval_files(paths: Tuple[str], only_english: bool = True, keep_markup: bool = False):
+    data_path, output_path = paths
+
+    output = dict()
+    with open(data_path, "r") as fi:
+
+        for website in fi:
             # Process the question
             content = json.loads(website)
+
             if only_english and content["Fasttext_language"] != "en":
                 continue
+
             questions = content["Questions"]
+
             for question in questions:
                 question_text = ""
+                instances = []
+
                 if "name_markup" in question.keys():
                     extracted_text = extract_text(question["name_markup"], keep_markup)
                     if extracted_text is not None:
                         question_text += extracted_text + " "
+
                 if "text_markup" in question.keys():
                     extracted_text = extract_text(question["text_markup"], keep_markup)
                     if extracted_text is not None:
                         question_text += extracted_text
+
                 # If question exists, check the answers for their markup capacities
                 if len(question_text) > 0:
                     accepted, suggested, vote = find_markup_options(question["Answers"])
+
                     # All information available
                     if accepted and suggested and vote:
                         instances.append(
                             full_info(question["Answers"], question_text, keep_markup)
                         )
+
                     # If no votes are available, pick at random from accepted and suggested
                     elif accepted and suggested:
                         instances.append(
@@ -240,29 +254,53 @@ def generate_passage_retrieval_files(data_path, only_english, keep_markup, outpu
                                 question["Answers"], question_text, keep_markup
                             )
                         )
+
                     # If only votes are available use above/below 2
                     elif vote:
                         instances.append(
                             vote_info(question["Answers"], question_text, keep_markup)
                         )
+
                     # Otherwise just select one at random to be a positive ctx and no hard negatives
                     else:
                         instances.append(
                             no_info(question["Answers"], question_text, keep_markup)
                         )
+                
+                if question_text and instances:
+                    output[question_text] = instances
 
-    with open(output_path + ".jsonl", "w") as f:
-        for sample in instances:
-            json_record = json.dumps(sample)
-            f.write(json_record + "\n")
+
+    with open(output_path, "w") as fo:
+        json.dump(output, fo)
+
+
+def main(args: Namespace):
+
+    assert os.path.isdir(args.input_folder)
+    assert not os.path.isdir(args.output_folder)
+
+    os.makedirs(args.output_folder, exist_ok=False)
+
+    files = []
+    for filename in os.listdir(args.input_folder):
+        files.append((
+            os.path.join(args.input_folder, filename),
+            os.path.join(args.output_folder, filename),
+        ))
+
+    fn_worker = partial(generate_passage_retrieval_files, only_english=args.only_english, keep_markup=args.keep_markup)
+    
+    with Pool(args.num_workers) as pool:
+        list(tqdm(pool.imap(fn_worker, files), desc="Processing...", total=len(files)))
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description="Generate passage retrieval objects for open-book QA"
     )
-    parser.add_argument("--data_path", help="Path to the json dataset")
-    parser.add_argument("--output_path", help="Path to the output file")
+    parser.add_argument("--input_folder", help="Path to the json dataset")
+    parser.add_argument("--output_folder", help="Path to the output file")
     parser.add_argument(
         "--only_english",
         action="store_true",
@@ -271,7 +309,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--keep_markup", action="store_true", help="Keep the HTML markup"
     )
-    args = parser.parse_args()
-    generate_passage_retrieval_files(
-        args.data_path, args.only_english, args.keep_markup, args.output_path
+    parser.add_argument(
+        "--num_workers", type=int, default=1, help="Use multiprocessing"
     )
+    main(parser.parse_args())
