@@ -93,7 +93,7 @@ def main(args: Namespace):
     os.makedirs(args.output_folder, exist_ok=False)
 
     files = []
-    for filename in os.listdir(args.data_folder):
+    for filename in os.listdir(args.input_folder):
         files.append((
             os.path.join(args.input_folder, filename),
             os.path.join(args.output_folder, filename),
